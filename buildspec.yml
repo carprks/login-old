@@ -1,0 +1,16 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - GO111MODULE=on
+  build:
+    commands:
+      - go mod download
+      - go build .
+      - aws cloudformation package --template-file template.yaml --s3-bucket=$S3_BUCKET --output-template-file outputtemplate.yml
+artifacts:
+  type: zip
+  files:
+    - login
+    - template.yaml
+    - outputtemplate.yml
