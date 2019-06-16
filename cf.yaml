@@ -26,7 +26,7 @@ Resources:
   Dynamo:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, dynamo]]
+      TableName: !Join ['-', [!Ref ServiceName, dynamo, !Ref Environment]]
       AttributeDefinitions:
         - AttributeName: ID
           AttributeType: S
@@ -40,7 +40,7 @@ Resources:
   AuthorizerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, authorizerRole]]
+      RoleName: !Join ['-', [!Ref ServiceName, authorizerRole, !Ref Environment]]
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -62,7 +62,7 @@ Resources:
   Authorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:
-      Name: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, authorizer]]
+      Name: !Join ['-', [!Ref ServiceName, authorizer, !Ref Environment]]
       RestApiId: !Ref RestAPI
       AuthorizerCredentials: !GetAtt AuthorizerRole.Arn
       AuthorizerResultTtlInSeconds: 0
@@ -73,7 +73,7 @@ Resources:
   RestAPI:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, restapi]]
+      Name: !Join ['-', [!Ref ServiceName, restapi, !Ref Environment]]
       EndpointConfiguration:
         Types:
           - REGIONAL
@@ -188,7 +188,7 @@ Resources:
       Type: A
       HostedZoneName: !Ref DNSZoneName
       Weight: 1
-      SetIdentifier: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, !Ref 'AWS::Region', recordset]]
+      SetIdentifier: !Join ['-', [!Ref ServiceName, recordset, !Ref Environment, !Ref 'AWS::Region']]
       AliasTarget:
         HostedZoneId: !GetAtt RestAPIDomainName.RegionalHostedZoneId
         DNSName: !GetAtt RestAPIDomainName.RegionalDomainName
@@ -197,7 +197,7 @@ Resources:
   ServiceARN:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, role]]
+      RoleName: !Join ['-', [!Ref ServiceName, role, !Ref Environment]]
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -223,7 +223,7 @@ Resources:
   Service:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, lambda]]
+      FunctionName: !Join ['-', [!Ref ServiceName, lambda, !Ref Environment]]
       Role: !Ref ServiceARN
       Runtime: go1.x
       Handler: !Ref ServiceName

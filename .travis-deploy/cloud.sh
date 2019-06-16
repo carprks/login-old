@@ -63,6 +63,8 @@ if [[ -z "$TRAVIS_PULL_REQUEST" ]] || [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; t
     AWS_SECRET_ACCESS_KEY=$DEV_AWS_SECRET_ACCESS_KEY
     S3_FOLDER=$DEV_S3_BUCKET
     DNS_ZONE_NAME=$DEV_DNS_ZONE_NAME
+    CERTIFICATE_ARN=$DEV_CERTIFICATE_ARN
+    AUTHORIZER_ARN=$DEV_AUTHORIZER_ARN
 
     echo "Deploy Dev"
     deployIt
@@ -71,17 +73,21 @@ if [[ -z "$TRAVIS_PULL_REQUEST" ]] || [[ "$TRAVIS_PULL_REQUEST" == "false" ]]; t
     echo "Deployed Dev"
 
     # Master has an extra step to launch into live
-    if [[ "$TRAVIS_BRANCH" == "master" ]]; then
-        AWS_ACCESS_KEY_ID=$LIVE_AWS_ACCESS_KEY_ID
-        AWS_SECRET_ACCESS_KEY=$LIVE_AWS_SECRET_ACCESS_KEY
-        S3_FOLDER=$LIVE_S3_BUCKET
-        DNS_ZONE_NAME=$LIVE_DNS_ZONE_NAME
-        DEPLOY_ENV=live
+    if [[ -z "$SKIP_LIVE" ]] || [[ "$SKIP_LIVE" == "false" ]]; then
+        if [[ "$TRAVIS_BRANCH" == "master" ]]; then
+            DEPLOY_ENV=live
+            AWS_ACCESS_KEY_ID=$LIVE_AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY=$LIVE_AWS_SECRET_ACCESS_KEY
+            S3_FOLDER=$LIVE_S3_BUCKET
+            DNS_ZONE_NAME=$LIVE_DNS_ZONE_NAME
+            CERTIFICATE_ARN=$LIVE_CERTIFICATE_ARN
+            AUTHORIZER_ARN=$LIVE_AUTHORIZER_ARN
 
-        echo "Deploy Live"
-        deployIt
-        cloudFormationDelete
-        cloudFormation
-        echo "Deployed Live"
+            echo "Deploy Live"
+            deployIt
+            cloudFormationDelete
+            cloudFormation
+            echo "Deployed Live"
+        fi
     fi
 fi
