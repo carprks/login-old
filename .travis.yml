@@ -1,0 +1,14 @@
+sudo: required
+language: go
+go:
+  - 1.12.5
+env:
+  - GO111MODULE=on
+install:
+  - pip install --user awscli
+script:
+  - go mod download
+  - go build .
+after_script:
+  - zip $TRAVIS_BUILD_ID.zip authorizer
+  - bash .travis-deploy/cloud.sh

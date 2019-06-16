@@ -1,0 +1,235 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Login Service"
+
+Parameters:
+  ServiceName:
+    Type: String
+  Environment:
+    Type: String
+  DomainName:
+    Type: String
+  AuthorizerARN:
+    Type: String
+  Stage:
+    Type: String
+    Default: v1
+  CertificateARN:
+    Type: String
+  DNSZoneName:
+    Type: String
+  BuildBucket:
+    Type: String
+  BuildKey:
+    Type: String
+
+Resources:
+  Dynamo:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, dynamo]]
+      AttributeDefinitions:
+        - AttributeName: ID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: ID
+          KeyType: HASH
+      ProvisionedThroughput:
+        WriteCapacityUnits: 5
+        ReadCapacityUnits: 5
+
+  AuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, authorizerRole]]
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: lambda
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Alllow
+                  Action: lambda:invokeFunction
+                  Resource: !Ref AuthorizerARN
+
+  Authorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, authorizer]]
+      RestApiId: !Ref RestAPI
+      AuthorizerCredentials: !GetAtt AuthorizerRole.Arn
+      AuthorizerResultTtlInSeconds: 0
+      AuthorizerUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthorizerARN}/invocations
+      Type: REQUEST
+      IdentitySource: !Sub methid.Request.header.X-Authorization
+
+  RestAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, restapi]]
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  RestAPIResourceProbe:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestAPI
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: probe
+  RestAPIResourceProbeGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResourceId: !Ref RestAPIResourceProbe
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      HttpMethod: GET
+      RequestParameters:
+        method.request.header.X-Authorization: true
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: |
+            {"statusCode": 200}
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates:
+              application/json: |
+                {}
+      MethodResponses:
+        - StatusCode: 200
+
+  RestAPILogin:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestAPI
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: login
+  RestAPILoginPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResourceId: !Ref RestAPILogin
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      HttpMethod: POST
+      RequestParameters:
+        method.request.header.X-Authorization: true
+      Integration:
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceARN}/invocations
+          - lambdaArn: !GetAtt Service.Arn
+
+  RestAPIVerify:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestAPI
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: verify
+  RestAPIVerifyPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResourceId: !Ref RestAPILogin
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      HttpMethod: POST
+      RequestParameters:
+        method.request.header.X-Authorization: true
+      Integration:
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceARN}/invocations
+          - lambdaArn: !GetAtt Service.Arn
+
+  RestAPIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: RestAPIResourceProbeGet
+    Properties:
+      RestApiId: !Ref RestAPI
+
+  RestAPIStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref RestAPI
+      StageName: !Ref Stage
+      DeploymentId: !Ref RestAPIDeployment
+
+  RestAPIDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      DomainName: !Ref DomainName
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      RegionalCertificateArn: !Ref CertificateARN
+
+  RestAPIDomainMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      BasePath: !Ref Stage
+      DomainName: !Ref RestAPIDomainName
+      RestApiId: !Ref RestAPI
+      Stage: !Ref RestAPIStage
+
+  PrimaryRecordSet:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      Name: !Ref DomainName
+      Type: A
+      HostedZoneName: !Ref DNSZoneName
+      Weight: 1
+      SetIdentifier: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, !Ref 'AWS::Region', recordset]]
+      AliasTarget:
+        HostedZoneId: !GetAtt RestAPIDomainName.RegionalHostedZoneId
+        DNSName: !GetAtt RestAPIDomainName.RegionalDomainName
+        EvaluatTargetHealth: false
+
+  ServiceARN:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, role]]
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+          - Effect: Allow
+            Action: dynamodb:*
+            Resource: !Ref Dynamo
+          - Effect: Allow
+            Resource: '*'
+            Action:
+              - dynamodb:DescribeReservedCapacityOfferings
+              - dynamodb:ListGlobalTables
+              - dynamodb:ListTables
+              - dynamodb:DescribeReservedCapacity
+              - dynamodb:ListBackups
+              - dynamodb:PurchaseReservedCapacityOfferings
+              - dynamodb:DescribeLimits
+              - dynamodb:ListStreams
+  Service:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Join ['-', [carprk, !Ref ServiceName, !Ref Environment, lambda]]
+      Role: !Ref ServiceARN
+      Runtime: go1.x
+      Handler: !Ref ServiceName
+      Environment:
+        DYNAMODB_TABLE: !Sub arn:aws:dynamodb:${AWS::Region}:table/${Dynamo}
+        DYNAMODB_ENDPOINT: !Join ['', ['http://', 'dynamodb.', !Ref 'AWS::Region', '.amazonaws.com']]
+      Code:
+        S3Bucket: !Ref BuildBucket
+        S3Key: !Ref BuildKey
