@@ -129,9 +129,8 @@ Resources:
             application/json: Empty
       Integration:
         Type: AWS_PROXY
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceARN}/invocations
-          - lambdaArn: !GetAtt Service.Arn
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Service.Arn}/invocations
+        IntegrationHttpMethod: POST
 
   RestAPIVerify:
     Type: AWS::ApiGateway::Resource
@@ -155,9 +154,8 @@ Resources:
             application/json: Empty
       Integration:
         Type: AWS_PROXY
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ServiceARN}/invocations
-          - lambdaArn: !GetAtt Service.Arn
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Service.Arn}/invocations
+        IntegrationHttpMethod: POST
 
   RestAPIDeployment:
     Type: AWS::ApiGateway::Deployment
