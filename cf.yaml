@@ -76,7 +76,7 @@ Resources:
       Name: !Join ['-', [!Ref ServiceName, restapi, !Ref Environment]]
       EndpointConfiguration:
         Types:
-          - EDGE
+          - REGIONAL
 
   RestAPIResourceProbe:
     Type: AWS::ApiGateway::Resource
@@ -176,8 +176,8 @@ Resources:
       DomainName: !Ref DomainName
       EndpointConfiguration:
         Types:
-          - EDGE
-      CertificateArn: !Ref CertificateARN
+          - REGIONAL
+      RegionalCertificateArn: !Ref CertificateARN
 
   RestAPIDomainMapping:
     Type: AWS::ApiGateway::BasePathMapping
