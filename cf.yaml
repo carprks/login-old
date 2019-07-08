@@ -78,6 +78,17 @@ Resources:
         Types:
           - REGIONAL
 
+  EmptyModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: application/json
+      Name: EmptyModel
+      RestApiId: !Ref RestAPI
+      Schema:
+        $schema: 'http://json-schema.org/draft-04/schema#'
+        title: Empty
+        type: object
+
   RestAPIResourceProbe:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -126,7 +137,7 @@ Resources:
       MethodResponses:
         - StatusCode: 200
           ResponseModels:
-            application/json: Empty
+            application/json: !Ref EmptyModel
       Integration:
         Type: AWS_PROXY
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Service.Arn}/invocations
@@ -151,10 +162,35 @@ Resources:
       MethodResponses:
         - StatusCode: 200
           ResponseModels:
-            application/json: Empty
+            application/json: !Ref EmptyModel
       Integration:
         Type: AWS_PROXY
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${Service.Arn}/invocations
+        IntegrationHttpMethod: POST
+
+  RestAPIRegister:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestAPI
+      ParentId: !GetAtt RestAPI.RootResourceId
+      PathPart: register
+  RestAPIRegisterPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestAPI
+      ResourceId: !Ref RestAPIRegister
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref Authorizer
+      HttpMethod: POST
+      RequestParameters:
+        method.request.header.X-Authorization: true
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+      Integration:
+        Type: AWS_PROXY
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015/03-31/functions/${Service.Arn}/invocations
         IntegrationHttpMethod: POST
 
   RestAPIDeployment:
